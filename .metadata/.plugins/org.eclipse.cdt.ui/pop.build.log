@@ -1,0 +1,18 @@
+14:06:46 **** Incremental Build of configuration Default for project pop ****
+make -r -j 8 --output-sync=target --no-print-directory 
+Loaded project.mk
+C:/MaximSDk/Libraries/SDHC/sdhc.mk:67: warning: overriding recipe for target 'distclean'
+C:/MaximSDk/Libraries/SDHC/ff15/fat32.mk:73: warning: ignoring old recipe for target 'distclean'
+****************************************************************************
+* Analog Devices MSDK
+* - User Guide: https://analogdevicesinc.github.io/msdk/USERGUIDE/
+* - Get Support: https://www.analog.com/support/technical-support.html
+* - Report Issues: https://github.com/analogdevicesinc/msdk/issues
+* - Contributing: https://analogdevicesinc.github.io/msdk/CONTRIBUTING/
+****************************************************************************
+arm-none-eabi-size --format=berkeley /c/Users/senth/Desktop/NCSU/Research/pop/build/pop.elf
+   text	   data	    bss	    dec	    hex	filename
+ 389120	   2608	  35820	 427548	  6861c	C:/Users/senth/Desktop/NCSU/Research/pop/build/pop.elf
+
+14:06:46 Build Finished. 0 errors, 2 warnings. (took 258ms)
+
