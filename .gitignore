@@ -1,23 +1,5 @@
-# Build artifacts and object files
-*.o
-*.d
-*.elf
-*.hex
-*.map
-*.a
-build/
-pop/build/
-
-# Temporary files
-*_tmp_file.c
-ln_args.txt
-ar_args.txt
-
-# IDE and editor files
-.vscode/
-*.swp
-*.swo
-*~
+# Eclipse metadata (keep this ignored)
+.metadata/
 
 # Python cache
 __pycache__/
@@ -25,7 +7,6 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-*.so
 
 # Virtual environment
 venv/
@@ -44,9 +25,6 @@ Thumbs.db
 # Windows specific
 *.tmp
 *.temp
-
-# Project specific
-project_defines.h
 
 # Log files
 *.log
