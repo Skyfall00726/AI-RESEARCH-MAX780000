@@ -1,0 +1,52 @@
+# Build artifacts and object files
+*.o
+*.d
+*.elf
+*.hex
+*.map
+*.a
+build/
+pop/build/
+
+# Temporary files
+*_tmp_file.c
+ln_args.txt
+ar_args.txt
+
+# IDE and editor files
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows specific
+*.tmp
+*.temp
+
+# Project specific
+project_defines.h
+
+# Log files
+*.log
