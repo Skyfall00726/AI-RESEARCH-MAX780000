@@ -178,6 +178,11 @@ static q15_t ml_softmax[NUM_OUTPUTS];
 uint8_t pAI85Buffer[SAMPLE_SIZE];
 
 int16_t Max, Min;
+
+/* Static variables for AddTranspose - moved here for explicit reset capability */
+static uint16_t transpose_row = 0;
+static uint16_t transpose_col = 0;
+static uint16_t transpose_total = 0;
 uint16_t thresholdHigh = THRESHOLD_HIGH;
 uint16_t thresholdLow = THRESHOLD_LOW;
 
@@ -232,6 +237,7 @@ uint8_t cnn_load_data(uint8_t *pIn);
 uint8_t MicReadChunk(uint16_t *avg);
 uint8_t AddTranspose(uint8_t *pIn, uint8_t *pOut, uint16_t inSize, uint16_t outSize,
                      uint16_t width);
+void ResetAddTranspose(void);
 uint8_t check_inference(q15_t *ml_soft, int32_t *ml_data, int16_t *out_class, double *out_prob);
 void I2SInit(void);
 static void codec_init(void);
@@ -597,34 +603,52 @@ int main(void)
                 // zero padding
                 memset(pChunkBuff, 0, CHUNK);
 
+                /* Reset AddTranspose state before processing new word */
+                PR_DEBUG("Before reset: transpose_total=%d, transpose_row=%d, transpose_col=%d\n", 
+                         transpose_total, transpose_row, transpose_col);
+                ResetAddTranspose();
+                PR_DEBUG("After reset: transpose_total=%d, transpose_row=%d, transpose_col=%d\n", 
+                         transpose_total, transpose_row, transpose_col);
+
                 /* PREAMBLE copy  */
                 if (utteranceIndex - PREAMBLE_SIZE >= 0) {
-                    if (AddTranspose((uint8_t *)&micBuff[utteranceIndex - PREAMBLE_SIZE],
-                                     pAI85Buffer, PREAMBLE_SIZE, SAMPLE_SIZE, TRANSPOSE_WIDTH)) {
+                    uint8_t ret = AddTranspose((uint8_t *)&micBuff[utteranceIndex - PREAMBLE_SIZE],
+                                     pAI85Buffer, PREAMBLE_SIZE, SAMPLE_SIZE, TRANSPOSE_WIDTH);
+                    PR_DEBUG("After preamble copy: ret=%d, transpose_total=%d\n", ret, transpose_total);
+                    if (ret) {
                         PR_DEBUG("ERROR: Transpose ended early \n");
                     }
                 } else {
                     /* copy oldest samples to the beginning*/
-                    if (AddTranspose(
+                    uint8_t ret2 = AddTranspose(
                             (uint8_t *)&micBuff[SAMPLE_SIZE - PREAMBLE_SIZE + utteranceIndex],
                             pAI85Buffer, PREAMBLE_SIZE - utteranceIndex, SAMPLE_SIZE,
-                            TRANSPOSE_WIDTH)) {
-                        PR_DEBUG("ERROR: Transpose ended early \n");
+                            TRANSPOSE_WIDTH);
+                    PR_DEBUG("After preamble part1: ret=%d, transpose_total=%d, size=%d\n", 
+                             ret2, transpose_total, PREAMBLE_SIZE - utteranceIndex);
+                    if (ret2) {
+                        PR_DEBUG("ERROR: Transpose ended early (preamble part1)\n");
                     }
 
                     /* copy latest samples afterwards */
-                    if (AddTranspose((uint8_t *)&micBuff[0], pAI85Buffer, utteranceIndex,
-                                     SAMPLE_SIZE, TRANSPOSE_WIDTH)) {
-                        PR_DEBUG("ERROR: Transpose ended early \n");
+                    uint8_t ret3 = AddTranspose((uint8_t *)&micBuff[0], pAI85Buffer, utteranceIndex,
+                                     SAMPLE_SIZE, TRANSPOSE_WIDTH);
+                    PR_DEBUG("After preamble part2: ret=%d, transpose_total=%d, size=%d\n", 
+                             ret3, transpose_total, utteranceIndex);
+                    if (ret3) {
+                        PR_DEBUG("ERROR: Transpose ended early (preamble part2)\n");
                     }
                 }
 
                 /* Utterance copy */
                 if (utteranceIndex < endIndex) {
                     /* copy from utternace to the end */
-                    if (AddTranspose((uint8_t *)&micBuff[utteranceIndex], pAI85Buffer,
-                                     endIndex - utteranceIndex, SAMPLE_SIZE, TRANSPOSE_WIDTH)) {
-                        PR_DEBUG("ERROR: Transpose ended early \n");
+                    uint8_t ret4 = AddTranspose((uint8_t *)&micBuff[utteranceIndex], pAI85Buffer,
+                                     endIndex - utteranceIndex, SAMPLE_SIZE, TRANSPOSE_WIDTH);
+                    PR_DEBUG("After utterance copy: ret=%d, transpose_total=%d, size=%d\n", 
+                             ret4, transpose_total, endIndex - utteranceIndex);
+                    if (ret4) {
+                        PR_DEBUG("ERROR: Transpose ended early (utterance copy)\n");
                     }
                     // copy zero padding
                     while (!ret) {
@@ -633,15 +657,21 @@ int main(void)
                     }
                 } else {
                     /* copy from utternace to the end*/
-                    if (AddTranspose((uint8_t *)&micBuff[utteranceIndex], pAI85Buffer,
-                                     SAMPLE_SIZE - utteranceIndex, SAMPLE_SIZE, TRANSPOSE_WIDTH)) {
-                        PR_DEBUG("ERROR: Transpose ended early \n");
+                    uint8_t ret5 = AddTranspose((uint8_t *)&micBuff[utteranceIndex], pAI85Buffer,
+                                     SAMPLE_SIZE - utteranceIndex, SAMPLE_SIZE, TRANSPOSE_WIDTH);
+                    PR_DEBUG("After utterance part1: ret=%d, transpose_total=%d, size=%d\n", 
+                             ret5, transpose_total, SAMPLE_SIZE - utteranceIndex);
+                    if (ret5) {
+                        PR_DEBUG("ERROR: Transpose ended early (utterance part1)\n");
                     }
 
                     /* copy from begining*/
-                    if (AddTranspose((uint8_t *)&micBuff[0], pAI85Buffer, endIndex, SAMPLE_SIZE,
-                                     TRANSPOSE_WIDTH)) {
-                        PR_DEBUG("ERROR: Transpose ended early \n");
+                    uint8_t ret6 = AddTranspose((uint8_t *)&micBuff[0], pAI85Buffer, endIndex, SAMPLE_SIZE,
+                                     TRANSPOSE_WIDTH);
+                    PR_DEBUG("After utterance part2: ret=%d, transpose_total=%d, size=%d\n", 
+                             ret6, transpose_total, endIndex);
+                    if (ret6) {
+                        PR_DEBUG("ERROR: Transpose ended early (utterance part2)\n");
                     }
                     // copy zero padding
                     while (!ret) {
@@ -1102,25 +1132,25 @@ uint8_t AddTranspose(uint8_t *pIn, uint8_t *pOut, uint16_t inSize, uint16_t outS
         (127,127)(127,126)(127,125)(127,124)
     */
 
-    static uint16_t row = 0, col = 0, total = 0;
+    /* Use global static variables instead of local static */
     uint16_t secondHalf = 0, wordRow = 0, byteInWord = 0, group = 0, index = 0;
 
     for (int i = 0; i < inSize; i++) {
         /* is it above 63? */
-        if (col >= (width >> 1)) {
+        if (transpose_col >= (width >> 1)) {
             secondHalf = 1; // odd word rows
         } else {
             secondHalf = 0; // even word rows
         }
 
         /* which group (0-15) it should be */
-        group = (col % (width >> 1)) / 4;
+        group = (transpose_col % (width >> 1)) / 4;
 
         /* which word row (0-255) within the group */
-        wordRow = secondHalf + (row << 1);
+        wordRow = secondHalf + (transpose_row << 1);
 
         /* which byte (0-3) in the word */
-        byteInWord = col % 4;
+        byteInWord = transpose_col % 4;
 
         /* find output index */
         index = 1024 * group + 4 * wordRow + byteInWord;
@@ -1128,30 +1158,38 @@ uint8_t AddTranspose(uint8_t *pIn, uint8_t *pOut, uint16_t inSize, uint16_t outS
         /* place sample in correct output location */
         pOut[index] = pIn[i];
 
-        total++;
+        transpose_total++;
 
         /* increment row and col index */
-        col++;
+        transpose_col++;
 
-        if (col >= width) {
-            col = 0;
-            row++;
+        if (transpose_col >= width) {
+            transpose_col = 0;
+            transpose_row++;
         }
     }
 
-    if (total >= outSize) {
+    if (transpose_total >= outSize) {
         /* sanity check */
-        if (row != width) {
+        if (transpose_row != width) {
             PR_DEBUG("ERROR: Rearranging!\n");
         }
 
-        total = 0;
-        row = 0;
-        col = 0;
+        transpose_total = 0;
+        transpose_row = 0;
+        transpose_col = 0;
         return 1;
     } else {
         return 0;
     }
+}
+/* **************************************************************************** */
+void ResetAddTranspose(void)
+{
+    /* Reset global transpose state variables before processing a new word */
+    transpose_row = 0;
+    transpose_col = 0;
+    transpose_total = 0;
 }
 /* **************************************************************************** */
 #ifndef ENABLE_MIC_PROCESSING
